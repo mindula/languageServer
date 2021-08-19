@@ -31,13 +31,13 @@ service class Service {
             // io:println(data);
 
             byte[] byteArray = data;
-            int? lastIndex = byteArray.lastIndexOf(10);
+            int? lastIndex = byteArray.indexOf(13);
             int lastx = <int> lastIndex;
             lastx += 1;
             foreach var i in 0...lastx{
                 byte remove = byteArray.remove(i);
             }   
-
+   
             io:println(byteArray);
 
             string|error firststring = string:fromBytes(data);
@@ -47,9 +47,10 @@ service class Service {
                     firstMessage = firststring; 
                 } else {
                     secondMessage = firststring;
-                }                      
+                }       
+                io:println(firstMessage+secondMessage);               
             }
-            io:println(firstMessage+secondMessage);
+            
 }
     
 
