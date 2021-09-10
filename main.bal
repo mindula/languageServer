@@ -2,7 +2,6 @@ import ballerina/io;
 import ballerina/log;
 import ballerina/tcp;
 
-
 service on new tcp:Listener(3000) {
 
     remote function onConnect(tcp:Caller caller) 
@@ -16,83 +15,114 @@ service class Service {
 
     remote function onBytes(tcp:Caller caller, readonly & byte[] data) 
         returns tcp:Error? {
-        error? e = self.handleInput(data);
+        error? e = self.handleInput(caller, data);
+
         if e is error {
             return;
         }
     }
-  
+
     byte[] buffer = [];
     byte[] buffer2 = [];
     int? expectedLen = ();
     int? lengthOne = ();
     int? lengthTwo = ();
+    int x = 0;
+    string message = "";
 
-    function handleInput(readonly & byte[] data) returns error? {
+    function handleInput(tcp:Caller caller, readonly & byte[] data) returns error? {
+
         if self.expectedLen == () {
 
             self.buffer = data;
             self.expectedLen = check extractContentLength(data);
             self.lengthOne = self.contentLengthRemover(self.buffer).length();
-     
+
         } 
         else {
 
             self.buffer2.push(...data);
             string|error stringTwo = string:fromBytes(self.buffer2);
-            if stringTwo is string{
-                self.lengthTwo = stringTwo.length(); 
+            if stringTwo is string {
+                self.lengthTwo = stringTwo.length();
             }
-  
         }
 
         int stringLength = <int>self.lengthOne + <int>self.lengthTwo;
-
         if (self.expectedLen == stringLength) {
-               
+
             self.buffer.push(...self.buffer2);
             json jsonObject = self.contentLengthRemover(self.buffer).toJson();
             io:println(jsonObject);
 
+            if (self.x == 0) {
+                self.message = "Content-Length: 171\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"resolveProvider\":true},\"workspace\":{\"workspaceFolders\":{\"supported\":true}}}}}";
+                self.x += 1;
+            } 
+            else if (self.x == 1) {
+                self.message = "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}";
+                self.x += 1;
+            } 
+            else if (self.x == 2) {
+                self.message = "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}";
+                self.x += 1;
+            } 
+            else if (self.x == 3) {
+                self.message = "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}";
+                self.x += 1;
+            } 
+            else {
+                self.message = "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}";
+            }
+
+            byte[] byteMessage = self.message.toBytes();
+            check caller->writeBytes(byteMessage);
+
+            self.expectedLen = ();
+            self.buffer.removeAll();
+            self.buffer2.removeAll();
+            self.lengthOne = 0;
+            self.lengthTwo = 0;
+
         } else {
-             io:println("Content Length Does not Match the Message Length" );
+            io:println("Content Length Does not Match the Message Length");
         }
 
         if self.buffer.length() == self.expectedLen {
             self.expectedLen = ();
             self.buffer.removeAll();
-        }   
-    
+        }
     }
-    function contentLengthRemover(byte [] data) returns string{
-            string|error stringOne = string:fromBytes(data);
-            string finalString = "";
-            if stringOne is string{
-                int indexOne = <int>stringOne.indexOf("{");
-                int indexTwo = stringOne.length();
-                finalString = stringOne.substring(indexOne, indexTwo);
-            }
-            return finalString;
+
+    function contentLengthRemover(byte[] data) returns string {
+        string|error stringOne = string:fromBytes(data);
+        string finalString = "";
+        if stringOne is string {
+            int indexOne = <int>stringOne.indexOf("{");
+            int indexTwo = stringOne.length();
+            finalString = stringOne.substring(indexOne, indexTwo);
+        }
+        return finalString;
     }
 
     remote function onError(tcp:Error err) returns tcp:Error? {
         log:printError("An error occurred", 'error = err);
     }
-  
+
     remote function onClose() returns tcp:Error? {
-        io:println("Client left");   
+        io:println("Client left");
     }
+
 }
 
-    function extractContentLength(readonly & byte[] data) returns int|error {
-        string s = check string:fromBytes(data);
-        int? newLinePos = s.indexOf("\r\n");
-        if newLinePos == () {
-            panic error("even the first tcp packet is too small to figure out the length");
-        } 
+function extractContentLength(readonly & byte[] data) returns int|error {
+    string s = check string:fromBytes(data);
+    int? newLinePos = s.indexOf("\r\n");
+    if newLinePos == () {
+        panic error("even the first tcp packet is too small to figure out the length");
+    } 
         else {
-            int? spacePos = s.lastIndexOf(" ", newLinePos);
-            return int:fromString(s.substring((spacePos ?: 0) + 1, newLinePos));
-        }
+        int? spacePos = s.lastIndexOf(" ", newLinePos);
+        return int:fromString(s.substring((spacePos ?: 0) + 1, newLinePos));
     }
-
+}
