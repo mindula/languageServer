@@ -23,26 +23,29 @@ service class Service {
     }
 
     byte[] buffer = [];
-    byte[] buffer2 = [];
     int? expectedLen = ();
     int? lengthOne = ();
     int? lengthTwo = ();
-    int x = 0;
-    string message = "";
+    int n = 0;
+    string[] response = ["Content-Length: 171\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"resolveProvider\":true},\"workspace\":{\"workspaceFolders\":{\"supported\":true}}}}}", 
+    "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}", 
+    "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}", 
+    "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}", 
+    "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}"];
 
     function handleInput(tcp:Caller caller, readonly & byte[] data) returns error? {
+        byte[] secondaryBuffer = [];
 
         if self.expectedLen == () {
 
             self.buffer = data;
             self.expectedLen = check extractContentLength(data);
             self.lengthOne = self.contentLengthRemover(self.buffer).length();
-
         } 
         else {
 
-            self.buffer2.push(...data);
-            string|error stringTwo = string:fromBytes(self.buffer2);
+            secondaryBuffer.push(...data);
+            string|error stringTwo = string:fromBytes(secondaryBuffer);
             if stringTwo is string {
                 self.lengthTwo = stringTwo.length();
             }
@@ -51,36 +54,17 @@ service class Service {
         int stringLength = <int>self.lengthOne + <int>self.lengthTwo;
         if (self.expectedLen == stringLength) {
 
-            self.buffer.push(...self.buffer2);
+            self.buffer.push(...secondaryBuffer);
             json jsonObject = self.contentLengthRemover(self.buffer).toJson();
-            io:println(jsonObject);
+            io:println(jsonObject);            
 
-            if (self.x == 0) {
-                self.message = "Content-Length: 171\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"resolveProvider\":true},\"workspace\":{\"workspaceFolders\":{\"supported\":true}}}}}";
-                self.x += 1;
-            } 
-            else if (self.x == 1) {
-                self.message = "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}";
-                self.x += 1;
-            } 
-            else if (self.x == 2) {
-                self.message = "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}";
-                self.x += 1;
-            } 
-            else if (self.x == 3) {
-                self.message = "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}";
-                self.x += 1;
-            } 
-            else {
-                self.message = "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}";
-            }
-
-            byte[] byteMessage = self.message.toBytes();
+            byte[] byteMessage = self.response[self.n].toBytes();
             check caller->writeBytes(byteMessage);
+            self.n +=1;
 
             self.expectedLen = ();
             self.buffer.removeAll();
-            self.buffer2.removeAll();
+            secondaryBuffer.removeAll();
             self.lengthOne = 0;
             self.lengthTwo = 0;
 
@@ -116,13 +100,13 @@ service class Service {
 }
 
 function extractContentLength(readonly & byte[] data) returns int|error {
-    string s = check string:fromBytes(data);
-    int? newLinePos = s.indexOf("\r\n");
+    string firstString = check string:fromBytes(data);
+    int? newLinePos = firstString.indexOf("\r\n");
     if newLinePos == () {
         panic error("even the first tcp packet is too small to figure out the length");
     } 
-        else {
-        int? spacePos = s.lastIndexOf(" ", newLinePos);
-        return int:fromString(s.substring((spacePos ?: 0) + 1, newLinePos));
+    else {
+        int? spacePos = firstString.lastIndexOf(" ", newLinePos);
+        return int:fromString(firstString.substring((spacePos ?: 0) + 1, newLinePos));
     }
 }
