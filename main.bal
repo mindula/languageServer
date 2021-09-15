@@ -54,7 +54,7 @@ service class Service {
                 self.messageContent = "";
                 self.buffer.removeAll();
 
-            } else if (<int>self.expectedLen < self.messageContent.length()){
+            } else if (<int> self.expectedLen < self.messageContent.length()){
                 panic error("Content Length Does not Match the Message Length");
             }   
 
