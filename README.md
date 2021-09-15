@@ -7,4 +7,3 @@
 
  ![Image of launch config](https://i.imgur.com/zrIx9OY.png)
 
-- The output will be written to file7.txt
