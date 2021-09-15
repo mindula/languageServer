@@ -24,57 +24,38 @@ service class Service {
 
     byte[] buffer = [];
     int? expectedLen = ();
-    string messageContent = "";
     int n = 0;
     string[] array = ["Content-Length: 171\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"resolveProvider\":true},\"workspace\":{\"workspaceFolders\":{\"supported\":true}}}}}", 
-    "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}", 
-    "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}", 
-    "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}", 
-    "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}"];
+                      "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}", 
+                      "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}", 
+                      "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}", 
+                      "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}"];
 
     function handleInput(tcp:Caller caller, readonly & byte[] data) returns error? {
+        string messageContent = "";
 
         if self.expectedLen == () {
-
             self.buffer = data;
             self.expectedLen = check extractContentLength(data);
 
         } else {
-
             self.buffer.push(...data);
-            self.messageContent = self.extractBody(self.buffer);
-            if (self.expectedLen == self.messageContent.length()) {
-                json jsonObject = self.messageContent.toJson();
+            messageContent = check extractContent(self.buffer);
+            if (self.expectedLen == messageContent.length()) {
+                json jsonObject = messageContent.toJson();
                 io:println(jsonObject);
 
                 byte[] byteMessage = self.array[self.n].toBytes();
                 check caller->writeBytes(byteMessage);
                 self.n += 1;
                 self.expectedLen = ();
-                self.messageContent = "";
+                messageContent = "";
                 self.buffer.removeAll();
 
-            } else if (<int> self.expectedLen < self.messageContent.length()){
-                panic error("Content Length Does not Match the Message Length");
+            } else if (<int> self.expectedLen < messageContent.length()){
+                panic error("Message length exceeds the expected length");
             }   
-
         }
-
-        if self.buffer.length() == self.expectedLen {
-            self.expectedLen = ();
-            self.buffer.removeAll();
-        }
-    }
-
-    function extractBody(byte[] data) returns string {
-        string|error stringOne = string:fromBytes(data);
-        string finalString = "";
-        if stringOne is string {
-            int indexOne = <int>stringOne.indexOf("{");
-            int indexTwo = stringOne.length();
-            finalString = stringOne.substring(indexOne, indexTwo);
-        }
-        return finalString;
     }
 
     remote function onError(tcp:Error err) returns tcp:Error? {
@@ -84,9 +65,8 @@ service class Service {
     remote function onClose() returns tcp:Error? {
         io:println("Client left");
     }
-
 }
-
+ 
 function extractContentLength(readonly & byte[] data) returns int|error {
     string s = check string:fromBytes(data);
     int? newLinePos = s.indexOf("\r\n");
@@ -97,4 +77,15 @@ function extractContentLength(readonly & byte[] data) returns int|error {
         int? spacePos = s.lastIndexOf(" ", newLinePos);
         return int:fromString(s.substring((spacePos ?: 0) + 1, newLinePos));
     }
+}
+
+function extractContent(byte[] data) returns string|error {
+    string|error stringOne = string:fromBytes(data);
+    string finalString = "";
+    if stringOne is string {
+        int indexOne = <int>stringOne.indexOf("{");
+        int indexTwo = stringOne.length();
+        finalString = stringOne.substring(indexOne, indexTwo);
+    }
+    return finalString;
 }
