@@ -42,7 +42,7 @@ service class Service {
         } else {
 
             self.buffer.push(...data);
-            self.messageContent = self.contentLengthRemover(self.buffer);
+            self.messageContent = self.extractBody(self.buffer);
             if (self.expectedLen == self.messageContent.length()) {
                 json jsonObject = self.messageContent.toJson();
                 io:println(jsonObject);
@@ -50,14 +50,13 @@ service class Service {
                 byte[] byteMessage = self.array[self.n].toBytes();
                 check caller->writeBytes(byteMessage);
                 self.n += 1;
-
                 self.expectedLen = ();
                 self.messageContent = "";
                 self.buffer.removeAll();
 
-            } else {
-                io:println("Content Length Does not Match the Message Length");
-            }
+            } else if (<int>self.expectedLen < self.messageContent.length()){
+                panic error("Content Length Does not Match the Message Length");
+            }   
 
         }
 
@@ -67,7 +66,7 @@ service class Service {
         }
     }
 
-    function contentLengthRemover(byte[] data) returns string {
+    function extractBody(byte[] data) returns string {
         string|error stringOne = string:fromBytes(data);
         string finalString = "";
         if stringOne is string {
