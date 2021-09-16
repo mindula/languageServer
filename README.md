@@ -1,6 +1,5 @@
 # languageServer
 
-- This is modified to support the ballerina language server
 - Clone https://github.com/mindula/vscode-extension-samples 
 - Go to lsp-sample folder https://github.com/mindula/vscode-extension-samples/tree/main/lsp-sample and set it up using the given instructions
 - Clone languageServer https://github.com/mindula/languageServer
