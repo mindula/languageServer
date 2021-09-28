@@ -1,6 +1,7 @@
 import ballerina/io;
 import ballerina/log;
 import ballerina/tcp;
+import ballerina/regex;
 
 service on new tcp:Listener(3000) {
 
@@ -10,6 +11,122 @@ service on new tcp:Listener(3000) {
         return new Service();
     }
 }
+
+    type Message record {
+        string jsonrpc;
+    };
+
+    type RequestMessage record {|
+        *Message;
+        int|string id;
+        string method;
+        any params?;
+    |};
+
+    type ResponseMessage record {|
+        *Message;
+        int|string|null id;
+        any result?;
+    |};
+
+    type NotificationMessage record {|
+        *Message;
+        string method;
+        any params;
+    |};
+
+    type CompletionOptions record {
+        boolean resolveProvider?;         
+    };
+
+    type WorkSpaceFolders record {
+        boolean supported?;                        
+    };
+
+    type WorkSpace record {
+        WorkSpaceFolders workspaceFolders;                
+    };
+
+    type ServerCapabilities record {
+        int|string textDocumentSync;
+        CompletionOptions completionProvider;
+        WorkSpace workspace;
+    };
+
+    type Initialize record {
+        ServerCapabilities capabilities;
+    };
+
+    type InitializeResult record {
+        *ResponseMessage;
+        string jsonrpc;
+        int|string|null id;
+        Initialize result;
+    };
+    
+    type Registration record {
+        string id;
+        string method;
+        anydata? registerOptions?;
+    };
+
+    type RegistrationParams record {
+        Registration[] registrations;
+    };
+
+    type RegisterCapability record {
+        *RequestMessage;
+        string jsonrpc;
+        int|string id;
+        "client/registerCapability" method;
+        RegistrationParams params;
+    };
+
+    type ConfigurationItem record {
+        string scopeUri;
+        string section;
+    };
+
+    type ConfigurationParams record {
+        ConfigurationItem[] items;
+    };
+
+    type Configuration record {
+        *RequestMessage;
+        string jsonrpc;
+        int|string id;
+        "workspace/configuration" method;
+        ConfigurationParams params;
+    };
+
+    int n = 0;
+
+    Message[] a = [<InitializeResult>{
+        jsonrpc:"2.0",
+        id:0,
+        result:{capabilities:{textDocumentSync:2,completionProvider:{resolveProvider:true},workspace:{workspaceFolders:{supported:true}}}}
+    },
+    
+    <RegisterCapability>{
+        jsonrpc:"2.0",
+        id:1,
+        method:"client/registerCapability",
+        params:{registrations:[{id:"36b409a1-be16-4010-b7bf-a26b6f659596",method:"workspace/didChangeWorkspaceFolders",registerOptions:{}}]}
+    },
+        
+    <RegisterCapability>{
+        jsonrpc:"2.0",
+        id:1,
+        method: "client/registerCapability",
+        params:{registrations:[{id:"36b409a1-be16-4010-b7bf-a26b6f659596",method:"workspace/didChangeWorkspaceFolders",registerOptions:{}}]}
+    },
+    
+    <Configuration>{
+        jsonrpc:"2.0",
+        id:2,
+        method:"workspace/configuration",
+        params:{items:[{scopeUri:"file:///c%3A/Users/Mindula/Desktop/vext/out.txt",section: "languageServerExample"}]}
+    }];
 
 service class Service {
 
@@ -24,13 +141,7 @@ service class Service {
 
     byte[] buffer = [];
     int? expectedLen = ();
-    int n = 0;
-    string[] array = ["Content-Length: 171\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"result\":{\"capabilities\":{\"textDocumentSync\":2,\"completionProvider\":{\"resolveProvider\":true},\"workspace\":{\"workspaceFolders\":{\"supported\":true}}}}}", 
-                      "Content-Length: 201\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"9716545a-b5e9-4b32-94e1-be674a62eb04\",\"method\":\"workspace/didChangeConfiguration\",\"registerOptions\":{}}]}}", 
-                      "Content-Length: 204\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"client/registerCapability\",\"params\":{\"registrations\":[{\"id\":\"36b409a1-be16-4010-b7bf-a26b6f659596\",\"method\":\"workspace/didChangeWorkspaceFolders\",\"registerOptions\":{}}]}}", 
-                      "Content-Length: 177\r\n\r\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"workspace/configuration\",\"params\":{\"items\":[{\"scopeUri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"section\":\"languageServerExample\"}]}}", 
-                      "Content-Length: 144\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":\"file:///c%3A/Users/Mindula/Desktop/vext/out.txt\",\"diagnostics\":[]}}"];
-
+    
     function handleInput(tcp:Caller caller, readonly & byte[] data) returns error? {
         string messageContent = "";
 
@@ -45,9 +156,13 @@ service class Service {
                 json jsonObject = messageContent.toJson();
                 io:println(jsonObject);
 
-                byte[] byteMessage = self.array[self.n].toBytes();
+                string s = a[n].toJsonString();
+                string s2 = regex:replaceAll(s, " ", "");
+                string response = "Content-Length: " + (s2.length()).toString() + "\r\n\r\n" + s2;
+                byte[] byteMessage = response.toBytes();
                 check caller->writeBytes(byteMessage);
-                self.n += 1;
+                n += 1;
+
                 self.expectedLen = ();
                 messageContent = "";
                 self.buffer.removeAll();
