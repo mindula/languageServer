@@ -4,7 +4,7 @@ import ballerina/regex;
 
 type Message record {
     string jsonrpc;
-};
+};htrhsfhfhshgsfhfs
 
 type RequestMessage record {|
     *Message;
